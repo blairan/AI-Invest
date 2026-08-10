@@ -1,0 +1,39 @@
+name: Auto Update TAIFEX Report
+
+on:
+  schedule:
+    # 每天早上 06:30 (台灣時間) 自動執行 (UTC 時間為前一天的 22:30)
+    # 此時夜盤已收盤且盤後法人數據已公布
+    - cron: '30 22 * * *'
+  workflow_dispatch: # 允許在 GitHub 網頁上手動點擊執行
+
+permissions:
+  contents: write
+
+jobs:
+  update-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Run scraper
+        run: |
+          python scraper_and_report.py
+
+      - name: Commit and Push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add daily_report.html
+          git commit -m "Auto-update daily report" || exit 0
+          git push
