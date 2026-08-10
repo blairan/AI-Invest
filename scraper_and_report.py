@@ -269,7 +269,9 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
     
     with open('daily_report.html', 'w', encoding='utf-8') as f:
         f.write(html)
-    print("成功產生 daily_report.html")
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(html)
+    print("成功產生 daily_report.html 和 index.html")
 
 if __name__ == "__main__":
     print("開始爬取期交所資料...")
