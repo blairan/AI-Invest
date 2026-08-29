@@ -36,6 +36,8 @@ jobs:
         run: |
           git config --local user.email "blairan121122885@gmail.com"
           git config --local user.name "blairan"
+          git config core.autocrlf false
+          git reset --hard HEAD
           git pull --rebase origin main
           git add daily_report.html index.html
           git commit -m "Auto-update daily report" || exit 0

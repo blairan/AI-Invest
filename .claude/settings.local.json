@@ -5,7 +5,31 @@
       "Bash(curl:*)",
       "Bash(pip show:*)",
       "Bash(pip install:*)",
+<<<<<<< Updated upstream
       "Bash(python:*)"
+=======
+      "Bash(python:*)",
+      "Bash(gh auth *)",
+      "Bash(where.exe gh *)",
+      "Bash(cmd.exe /c \"where gh\")",
+      "Read(//c/Program Files/Git/usr/bin/**)",
+      "Read(//c/Program Files \\(x86\\)/Git/usr/bin/**)",
+      "Read(//mnt/c/Program Files \\(x86\\)/**)",
+      "Read(//c/Program Files \\(x86\\)/**)",
+      "Bash(powershell.exe *)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe auth *)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe repo *)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe run *)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" run view --repo blairan/AI-Invest --log --json status,conclusion,name,event,createdAt,runNumber --jq 'select\\(.event == \"schedule\"\\) | .')",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" run view --repo blairan/AI-Invest 33147152383 --log)",
+      "Bash(/c/Program Files/GitHub CLI/gh.exe workflow *)",
+      "Read(//c//**)",
+      "Bash(rm -rf AI-Invest-fix)",
+      "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo clone blairan/AI-Invest AI-Invest-fix)",
+      "Read(//e/我的AI投資系統/**)",
+      "Skill(update-config)",
+      "Bash(claude --version)"
+>>>>>>> Stashed changes
     ]
   }
 }
