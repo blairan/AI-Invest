@@ -6,7 +6,7 @@ import os
 def get_market_data():
     url = 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
-    
+
     # 1. 取得日盤資料 (一般交易時段) : 往前找前一個交易日
     day_volume = 0
     try:
@@ -15,13 +15,13 @@ def get_market_data():
             if target_date.weekday() >= 5: # 週末跳過
                 target_date -= datetime.timedelta(days=1)
                 continue
-                
+
             date_str = target_date.strftime('%Y/%m/%d')
             data = {'queryType': 2, 'marketCode': 0, 'commodity_id': 'TX', 'queryDate': date_str}
             res_day = requests.post(url, data=data, headers=headers, timeout=10)
             soup_day = BeautifulSoup(res_day.text, 'html.parser')
             table_day = soup_day.find('table', class_='table_f')
-            
+
             if table_day:
                 rows = table_day.find_all('tr')
                 if len(rows) > 1:
@@ -35,10 +35,10 @@ def get_market_data():
                             break
                     except ValueError:
                         pass
-            
+
             # 沒找到資料（可能是國定假日），往前推一天
             target_date -= datetime.timedelta(days=1)
-            
+
     except Exception as e:
         print(f"取得日盤資料失敗: {e}")
 
@@ -60,8 +60,8 @@ def get_market_data():
                     break
     except Exception as e:
         print(f"取得夜盤資料失敗: {e}")
-        
-    # 3. 取得三大法人外資夜盤多空淨額
+
+    # 3. 取得三大法人外援夜盤多空淨額
     foreign_net_position = "請手動輸入"
     try:
         url_ah = 'https://www.taifex.com.tw/cht/3/futContractsDateAh'
@@ -72,29 +72,29 @@ def get_market_data():
             rows = table_ah.find_all('tr')
             for i, row in enumerate(rows):
                 tds = [td.text.strip().replace(',', '') for td in row.find_all(['td', 'th'])]
-                # 尋找臺股期貨且身份別為外資的那一行
-                # 臺股期貨自營商通常是第一筆，外資通常在往下兩行
-                if len(tds) >= 7 and '外資' in tds[0]:
+                # 尋找臺股期貨且身份別為外援的那一行
+                # 臺股期貨自營商通常是第一筆，外援通常在往下兩行
+                if len(tds) >= 7 and '外援' in tds[0]:
                     # 確認它的上一層是臺股期貨
                     prev_rows_text = " ".join([td.text for td in rows[i-2].find_all(['td', 'th'])])
                     if '臺股期貨' in prev_rows_text:
-                        # 外資行的多空淨額口數通常在索引 5
+                        # 外援行的多空淨額口數通常在索引 5
                         foreign_net_position = tds[5]
                         if not foreign_net_position.startswith('-') and foreign_net_position != '0':
                             foreign_net_position = '+' + foreign_net_position
                         break
     except Exception as e:
         print(f"取得三大法人資料失敗: {e}")
-    
+
     return day_volume, night_volume, night_price_change, foreign_net_position
 
 def evaluate(day_volume, night_volume, night_price_change, foreign_net_position):
     if day_volume == 0 and night_volume == 0:
         return 0, "無效數據"
-    
+
     total_volume = day_volume + night_volume
     ratio = (night_volume / total_volume) * 100 if total_volume > 0 else 0
-    
+
     if ratio < 30:
         signal = "夜盤參考價值較低"
     elif 31 <= ratio <= 39:
@@ -103,26 +103,45 @@ def evaluate(day_volume, night_volume, night_price_change, foreign_net_position)
         signal = "很強的訊號"
     else:
         signal = "中性看待"
-        
+
     return ratio, signal
 
 def generate_html(day_volume, night_volume, night_price_change, foreign_net_position, ratio, signal):
     date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    
+
     prompt = f"""請以投資顧問的角度，根據以下數據對今日台股加權指數開盤與走勢進行評估：
 1. 台指期夜盤漲跌：{night_price_change}
 2. 台指期夜盤成交量：{night_volume} 口
 3. 台指期日盤成交量：{day_volume} 口
 4. 夜盤量占比：{ratio:.1f}% ({signal})
-5. 外資夜盤多空淨額：{foreign_net_position} 口
+5. 外援夜盤多空淨額：{foreign_net_position} 口
 
 請參考以下原則：
 - 夜盤量占比 <30% 參考價值低，>40% 很強的訊號。
 - 綜合研判範例：
   (1) 夜盤上漲，多空淨額為正：上漲力道紮實。
   (2) 夜盤上漲，多空淨額為負：上漲力道不強，盤中或尾盤可能往下走。
-  (3) 夜盤下跌，多空淨額為負：外資看跌，開盤可能往下修正。
+  (3) 夜盤下跌，多空淨額為負：外援看跌，開盤可能往下修正。
   (4) 夜盤下跌，多空淨額為正：抄底機會，開盤可能往下修正再反彈。"""
+
+    # 根據訊號決定 badge 類別
+    if ratio > 40:
+        badge_class = "badge-strong"
+        badge_text = "很強的訊號"
+    elif ratio >= 30:
+        badge_class = "badge-neutral"
+        badge_text = "中性看待"
+    else:
+        badge_class = "badge-weak"
+        badge_text = "參考價值低"
+
+    # 根據漲跌決定顏色
+    if '▲' in str(night_price_change):
+        price_color_class = "red"
+    elif '▼' in str(night_price_change):
+        price_color_class = "green"
+    else:
+        price_color_class = ""
 
     html = f"""<!DOCTYPE html>
 <html lang="zh-TW">
@@ -137,8 +156,8 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
             --text-main: #1f2937;
             --text-muted: #6b7280;
             --primary: #3b82f6;
-            --up-color: #ef4444; /* 台灣股市紅色為漲 */
-            --down-color: #10b981; /* 台灣股市綠色為跌 */
+            --up-color: #ef4444;
+            --down-color: #10b981;
         }}
         body {{
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -165,8 +184,8 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
         }}
         .dashboard {{
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
             margin-bottom: 30px;
         }}
         .card {{
@@ -177,17 +196,30 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
             text-align: center;
         }}
         .card h3 {{
-            margin: 0 0 10px 0;
-            font-size: 1rem;
+            margin: 0 0 8px 0;
+            font-size: 0.9rem;
             color: var(--text-muted);
+            font-weight: 500;
         }}
         .card .value {{
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: bold;
+            margin-bottom: 8px;
         }}
+        .card .badge {{
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }}
+        .badge-strong {{ background: #fef3c7; color: #d97706; }}
+        .badge-neutral {{ background: #e5e7eb; color: #6b7280; }}
+        .badge-weak {{ background: #d1fae5; color: #059669; }}
         .red {{ color: var(--up-color); }}
         .green {{ color: var(--down-color); }}
-        
+        .orange {{ color: #f59e0b; }}
+        .blue {{ color: var(--primary); }}
+
         .result-section {{
             background: var(--card-bg);
             padding: 25px;
@@ -235,16 +267,16 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
         <div class="dashboard">
             <div class="card">
                 <h3>夜盤漲跌</h3>
-                <div class="value {'red' if '▲' in str(night_price_change) else 'green' if '▼' in str(night_price_change) else ''}">{night_price_change if night_price_change else '無資料'}</div>
+                <div class="value {price_color_class}">{night_price_change if night_price_change else '無資料'}</div>
             </div>
             <div class="card">
                 <h3>夜盤量佔比</h3>
-                <div class="value" style="color: {'var(--up-color)' if ratio > 40 else 'var(--text-main)'};">{ratio:.1f}%</div>
-                <div style="font-size: 0.9rem; margin-top:5px; color: var(--text-muted);">{signal}</div>
+                <div class="value blue">{ratio:.1f}%</div>
+                <span class="badge {badge_class}">{badge_text}</span>
             </div>
             <div class="card">
-                <h3>外資多空淨額</h3>
-                <div class="value" style="font-size: 1.2rem; color: #f59e0b;">{foreign_net_position}</div>
+                <h3>外援多空淨額</h3>
+                <div class="value orange">{foreign_net_position}</div>
             </div>
         </div>
 
@@ -266,7 +298,7 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
     </script>
 </body>
 </html>"""
-    
+
     with open('daily_report.html', 'w', encoding='utf-8') as f:
         f.write(html)
     with open('index.html', 'w', encoding='utf-8') as f:
@@ -277,8 +309,8 @@ if __name__ == "__main__":
     print("開始爬取期交所資料...")
     d_vol, n_vol, n_price, f_net = get_market_data()
     print(f"日盤量: {d_vol}, 夜盤量: {n_vol}, 夜盤漲跌: {n_price}")
-    
+
     ratio, signal = evaluate(d_vol, n_vol, n_price, f_net)
     print(f"佔比: {ratio:.1f}%, 訊號: {signal}")
-    
+
     generate_html(d_vol, n_vol, n_price, f_net, ratio, signal)
