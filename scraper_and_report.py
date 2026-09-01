@@ -151,17 +151,18 @@ def get_market_data():
 
         if table_ah:
             rows = table_ah.find_all('tr')
-            for i, row in enumerate(rows):
-                tds = [td.text.strip().replace(',', '') for td in row.find_all(['td', 'th'])]
-                if len(tds) >= 6 and '外援' in tds[0]:
-                    prev_rows_text = " ".join([td.text for td in rows[i-2].find_all(['td', 'th'])])
-                    if '臺股期貨' in prev_rows_text:
-                        foreign_net_position = tds[5]
-                        if not foreign_net_position.startswith('-') and foreign_net_position != '0':
-                            foreign_net_position = '+' + foreign_net_position
-                        foreign_date_found = taiwan_date_str
-                        print(f"  外援多空淨額: {foreign_net_position}")
-                        break
+            # 結構：Row 3=臺股期貨(自營商), Row 4=投信, Row 5=外援 (子列，無商品名稱)
+            # 子列格式：身份別, 多方口數, 多方金額, 空方口數, 空方金額, 多空淨額口數, 多空淨額金額
+            if len(rows) > 5:
+                tds = [td.text.strip().replace(',', '') for td in rows[5].find_all(['td', 'th'])]
+                # tds[0] = '外援'（身份別）, tds[5] = 多空淨額口數
+                # 用 Unicode codepoint 確認：外援 = U+5916 U+63F4
+                if len(tds) >= 6 and tds[0][0] == '外' and tds[0][1] == '資':
+                    foreign_net_position = tds[5]
+                    if not foreign_net_position.startswith('-') and foreign_net_position != '0':
+                        foreign_net_position = '+' + foreign_net_position
+                    foreign_date_found = taiwan_date_str
+                    print(f"  外援多空淨額: {foreign_net_position} (多方: {tds[1]}, 空方: {tds[3]})")
 
     except Exception as e:
         print(f"  取得三大法人資料失敗: {e}")
