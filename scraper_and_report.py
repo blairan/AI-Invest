@@ -1,24 +1,60 @@
 import requests
 from bs4 import BeautifulSoup
 import datetime
+import pytz
 import os
+
+def get_taiwan_now():
+    """取得台灣當前時間"""
+    taiwan_tz = pytz.timezone('Asia/Taipei')
+    return datetime.datetime.now(taiwan_tz)
+
+def get_last_trading_day(taiwan_now):
+    """取得上一個交易日（跳過週末）"""
+    target = taiwan_now.date() - datetime.timedelta(days=1)
+    for _ in range(10):
+        if target.weekday() < 5:  # 0-4 = 週一至週五
+            return target
+        target -= datetime.timedelta(days=1)
+    return taiwan_now.date() - datetime.timedelta(days=3)
 
 def get_market_data():
     url = 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Referer': 'https://www.taifex.com.tw/cht/3/futDailyMarketReport'
+    }
 
-    # 1. 取得日盤資料 (一般交易時段) : 往前找前一個交易日
+    taiwan_now = get_taiwan_now()
+    taiwan_date_str = taiwan_now.strftime('%Y/%m/%d')
+    print(f"[{taiwan_now.strftime('%Y-%m-%d %H:%M:%S')} 台灣時間] 開始爬取資料")
+
+    # ── 1. 取得日盤資料 (一般交易時段) ──────────────────────────────
+    # 日盤資料在 15:00 後才會完整，所以我們抓「上一個交易日」
     day_volume = 0
+    day_date_found = None
     try:
-        target_date = datetime.date.today() - datetime.timedelta(days=1)
-        for _ in range(10): # 往前找最多 10 天
-            if target_date.weekday() >= 5: # 週末跳過
+        # workflow 在 07:00執行，此時昨日日盤已完整
+        target_date = get_last_trading_day(taiwan_now)
+        for _ in range(10):
+            if target_date.weekday() >= 5:
                 target_date -= datetime.timedelta(days=1)
                 continue
 
             date_str = target_date.strftime('%Y/%m/%d')
-            data = {'queryType': 2, 'marketCode': 0, 'commodity_id': 'TX', 'queryDate': date_str}
-            res_day = requests.post(url, data=data, headers=headers, timeout=10)
+            print(f"  查詢日盤日期: {date_str}")
+
+            data = {
+                'queryType': 2,
+                'marketCode': 0,
+                'commodity_id': 'TX',
+                'queryDate': date_str
+            }
+            res_day = requests.post(url, data=data, headers=headers, timeout=15)
+            res_day.encoding = 'utf-8'
             soup_day = BeautifulSoup(res_day.text, 'html.parser')
             table_day = soup_day.find('table', class_='table_f')
 
@@ -26,71 +62,121 @@ def get_market_data():
                 rows = table_day.find_all('tr')
                 if len(rows) > 1:
                     header = [t.text.strip() for t in rows[0].find_all(['td', 'th'])]
-                    try:
-                        # queryType=2 指定日期時，欄位名稱可能是 '*一般交易時段成交量' 或 '*成交量'
-                        vol_idx = header.index('*一般交易時段成交量') if '*一般交易時段成交量' in header else header.index('*成交量')
-                        tds = [td.text.strip() for td in rows[1].find_all(['td', 'th'])]
-                        if len(tds) > vol_idx and tds[vol_idx].replace(',', '').isdigit():
-                            day_volume = int(tds[vol_idx].replace(',', ''))
+                    # 嘗試多個可能的成交量欄位名稱
+                    vol_candidates = ['*一般交易時段成交量', '*成交量', '一般交易時段成交量', '成交量']
+                    vol_idx = None
+                    for cand in vol_candidates:
+                        if cand in header:
+                            vol_idx = header.index(cand)
                             break
-                    except ValueError:
-                        pass
 
-            # 沒找到資料（可能是國定假日），往前推一天
+                    if vol_idx is not None:
+                        tds = [td.text.strip() for td in rows[1].find_all(['td', 'th'])]
+                        if len(tds) > vol_idx:
+                            raw_vol = tds[vol_idx].replace(',', '').strip()
+                            print(f"    找到日盤資料，原始值: '{tds[vol_idx]}' → 解析為: {raw_vol}")
+                            if raw_vol.isdigit():
+                                day_volume = int(raw_vol)
+                                day_date_found = date_str
+                                break
             target_date -= datetime.timedelta(days=1)
 
-    except Exception as e:
-        print(f"取得日盤資料失敗: {e}")
+        if day_date_found:
+            print(f"  日盤成交量: {day_volume} (日期: {day_date_found})")
+        else:
+            print(f"  未找到日盤資料")
 
-    # 2. 取得夜盤資料 (盤後交易時段)
-    # queryType=2, marketCode=1, commodity_id=TX
+    except Exception as e:
+        print(f"  取得日盤資料失敗: {e}")
+
+    # ── 2. 取得夜盤資料 (盤後交易時段) ──────────────────────────────
+    # 夜盤是 15:00 ~ 隔日 05:00，
+    # 若在 07:00 執行，昨夜夜盤（昨日 15:00 ~ 今晨 05:00）已收盤
+    # 查詢時傳入「昨天」作為日期參數
     night_volume = 0
     night_price_change = ""
+    night_date_found = None
     try:
-        res_night = requests.post(url, data={'queryType': 2, 'marketCode': 1, 'commodity_id': 'TX'}, headers=headers, timeout=10)
+        # 夜盤查詢日期 = 前一天（因為夜盤是前一天15:00開盤）
+        night_query_date = get_last_trading_day(taiwan_now)
+        night_date_str = night_query_date.strftime('%Y/%m/%d')
+        print(f"  查詢夜盤日期: {night_date_str}")
+
+        data_night = {
+            'queryType': 2,
+            'marketCode': 1,  # 夜盤
+            'commodity_id': 'TX',
+            'queryDate': night_date_str
+        }
+        res_night = requests.post(url, data=data_night, headers=headers, timeout=15)
+        res_night.encoding = 'utf-8'
         soup_night = BeautifulSoup(res_night.text, 'html.parser')
         table_night = soup_night.find('table', class_='table_f')
+
         if table_night:
             rows = table_night.find_all('tr')
             for row in rows:
                 tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
-                if len(tds) > 8 and tds[0] == 'TX' and (tds[8].replace(',', '').isdigit()):
-                    night_price_change = tds[6]
-                    night_volume = int(tds[8].replace(',', ''))
-                    break
-    except Exception as e:
-        print(f"取得夜盤資料失敗: {e}")
+                # TX 夜盤資料判斷：依據報價表結構
+                # tds[0] 為商品名稱，tds[6] 為漲跌，tds[8] 為成交量
+                if len(tds) > 8 and tds[0] == 'TX':
+                    raw_vol = tds[8].replace(',', '').strip()
+                    if raw_vol.isdigit():
+                        night_price_change = tds[6]
+                        night_volume = int(raw_vol)
+                        night_date_found = night_date_str
+                        print(f"  夜盤成交量: {night_volume}, 漲跌: {night_price_change}")
+                        break
 
-    # 3. 取得三大法人外援夜盤多空淨額
+        if not night_date_found:
+            print(f"  未找到夜盤 TX 資料，嘗試整頁搜尋...")
+            # 除錯：列出前幾行的內容
+            if table_night:
+                for i, row in enumerate(table_night.find_all('tr')[:5]):
+                    tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
+                    print(f"    Row {i}: {tds[:10]}")
+
+    except Exception as e:
+        print(f"  取得夜盤資料失敗: {e}")
+
+    # ── 3. 取得三大法人外援夜盤多空淨額 ────────────────────────────
     foreign_net_position = "請手動輸入"
+    foreign_date_found = None
     try:
         url_ah = 'https://www.taifex.com.tw/cht/3/futContractsDateAh'
-        res_ah = requests.get(url_ah, headers=headers, timeout=10)
+        res_ah = requests.get(url_ah, headers=headers, timeout=15)
+        res_ah.encoding = 'utf-8'
         soup_ah = BeautifulSoup(res_ah.text, 'html.parser')
         table_ah = soup_ah.find('table', class_='table_f')
+
         if table_ah:
             rows = table_ah.find_all('tr')
             for i, row in enumerate(rows):
                 tds = [td.text.strip().replace(',', '') for td in row.find_all(['td', 'th'])]
-                # 尋找臺股期貨且身份別為外援的那一行
-                # 臺股期貨自營商通常是第一筆，外援通常在往下兩行
-                if len(tds) >= 7 and '外援' in tds[0]:
-                    # 確認它的上一層是臺股期貨
+                if len(tds) >= 6 and '外援' in tds[0]:
                     prev_rows_text = " ".join([td.text for td in rows[i-2].find_all(['td', 'th'])])
                     if '臺股期貨' in prev_rows_text:
-                        # 外援行的多空淨額口數通常在索引 5
                         foreign_net_position = tds[5]
                         if not foreign_net_position.startswith('-') and foreign_net_position != '0':
                             foreign_net_position = '+' + foreign_net_position
+                        foreign_date_found = taiwan_date_str
+                        print(f"  外援多空淨額: {foreign_net_position}")
                         break
-    except Exception as e:
-        print(f"取得三大法人資料失敗: {e}")
 
+    except Exception as e:
+        print(f"  取得三大法人資料失敗: {e}")
+
+    # ── 4. 資料有效性檢查 ───────────────────────────────────────────
+    # 確保至少有一個資料不是 0
+    if day_volume == 0 and night_volume == 0:
+        print("  [警告] 日盤和夜盤成交量皆為 0，資料可能過舊或抓取失敗")
+
+    print(f"  完成！日期: {taiwan_date_str}")
     return day_volume, night_volume, night_price_change, foreign_net_position
 
 def evaluate(day_volume, night_volume, night_price_change, foreign_net_position):
     if day_volume == 0 and night_volume == 0:
-        return 0, "無效數據"
+        return 0, "無效數據", None
 
     total_volume = day_volume + night_volume
     ratio = (night_volume / total_volume) * 100 if total_volume > 0 else 0
@@ -104,10 +190,16 @@ def evaluate(day_volume, night_volume, night_price_change, foreign_net_position)
     else:
         signal = "中性看待"
 
-    return ratio, signal
+    return ratio, signal, total_volume
 
-def generate_html(day_volume, night_volume, night_price_change, foreign_net_position, ratio, signal):
-    date_str = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+def generate_html(day_volume, night_volume, night_price_change, foreign_net_position, ratio, signal, total_volume=None):
+    taiwan_tz = pytz.timezone('Asia/Taipei')
+    taiwan_now = datetime.datetime.now(taiwan_tz)
+    date_str = taiwan_now.strftime("%Y-%m-%d %H:%M:%S 台灣時間")
+
+    # 取得資料日期描述
+    last_trading = get_last_trading_day(taiwan_now)
+    data_date_str = last_trading.strftime("%Y/%m/%d")
 
     prompt = f"""請以投資顧問的角度，根據以下數據對今日台股加權指數開盤與走勢進行評估：
 1. 台指期夜盤漲跌：{night_price_change}
@@ -306,11 +398,14 @@ def generate_html(day_volume, night_volume, night_price_change, foreign_net_posi
     print("成功產生 daily_report.html 和 index.html")
 
 if __name__ == "__main__":
+    print("=" * 50)
     print("開始爬取期交所資料...")
+    print("=" * 50)
     d_vol, n_vol, n_price, f_net = get_market_data()
     print(f"日盤量: {d_vol}, 夜盤量: {n_vol}, 夜盤漲跌: {n_price}")
 
-    ratio, signal = evaluate(d_vol, n_vol, n_price, f_net)
-    print(f"佔比: {ratio:.1f}%, 訊號: {signal}")
+    ratio, signal, total_vol = evaluate(d_vol, n_vol, n_price, f_net)
+    print(f"總成交量: {total_vol} 口, 夜盤佔比: {ratio:.1f}%, 訊號: {signal}")
 
-    generate_html(d_vol, n_vol, n_price, f_net, ratio, signal)
+    generate_html(d_vol, n_vol, n_price, f_net, ratio, signal, total_vol)
+    print("=" * 50)
