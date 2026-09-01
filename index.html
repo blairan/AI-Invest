@@ -11,8 +11,8 @@
             --text-main: #1f2937;
             --text-muted: #6b7280;
             --primary: #3b82f6;
-            --up-color: #ef4444; /* 台灣股市紅色為漲 */
-            --down-color: #10b981; /* 台灣股市綠色為跌 */
+            --up-color: #ef4444;
+            --down-color: #10b981;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -39,8 +39,8 @@
         }
         .dashboard {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
             margin-bottom: 30px;
         }
         .card {
@@ -51,17 +51,30 @@
             text-align: center;
         }
         .card h3 {
-            margin: 0 0 10px 0;
-            font-size: 1rem;
+            margin: 0 0 8px 0;
+            font-size: 0.9rem;
             color: var(--text-muted);
+            font-weight: 500;
         }
         .card .value {
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: bold;
+            margin-bottom: 8px;
         }
+        .card .badge {
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            display: inline-block;
+        }
+        .badge-strong { background: #fef3c7; color: #d97706; }
+        .badge-neutral { background: #e5e7eb; color: #6b7280; }
+        .badge-weak { background: #d1fae5; color: #059669; }
         .red { color: var(--up-color); }
         .green { color: var(--down-color); }
-        
+        .orange { color: #f59e0b; }
+        .blue { color: var(--primary); }
+
         .result-section {
             background: var(--card-bg);
             padding: 25px;
@@ -103,39 +116,22 @@
     <div class="container">
         <div class="header">
             <h1>當日加權指數漲跌評估</h1>
-<<<<<<< Updated upstream
-            <p>數據更新時間：2026-08-28 23:14:25</p>
-=======
-            <p>數據更新時間：2026-08-11 06:59:41</p>
->>>>>>> Stashed changes
+            <p>數據更新時間：2026-09-01 14:51:23 台灣時間</p>
         </div>
 
         <div class="dashboard">
             <div class="card">
                 <h3>夜盤漲跌</h3>
-<<<<<<< Updated upstream
                 <div class="value green">▼-457</div>
             </div>
             <div class="card">
                 <h3>夜盤量佔比</h3>
-                <div class="value" style="color: var(--up-color);">41.4%</div>
-                <div style="font-size: 0.9rem; margin-top:5px; color: var(--text-muted);">很強的訊號</div>
+                <div class="value blue">40.2%</div>
+                <span class="badge badge-strong">很強的訊號</span>
             </div>
             <div class="card">
-                <h3>外資多空淨額</h3>
-                <div class="value" style="font-size: 1.2rem; color: #f59e0b;">+17</div>
-=======
-                <div class="value green">▼-271</div>
-            </div>
-            <div class="card">
-                <h3>夜盤量佔比</h3>
-                <div class="value" style="color: var(--text-main);">36.9%</div>
-                <div style="font-size: 0.9rem; margin-top:5px; color: var(--text-muted);">中性看待</div>
-            </div>
-            <div class="card">
-                <h3>外資多空淨額</h3>
-                <div class="value" style="font-size: 1.2rem; color: #f59e0b;">-577</div>
->>>>>>> Stashed changes
+                <h3>外援多空淨額</h3>
+                <div class="value orange">請手動輸入</div>
             </div>
         </div>
 
@@ -143,26 +139,18 @@
             <h2>AI 評估提示詞 (Prompt)</h2>
             <p>請將以下提示詞複製，並貼上至 ChatGPT、Gemini 或其他大語言模型中，以獲取今日盤勢解析。</p>
             <div class="prompt-box" id="promptText">請以投資顧問的角度，根據以下數據對今日台股加權指數開盤與走勢進行評估：
-<<<<<<< Updated upstream
 1. 台指期夜盤漲跌：▼-457
 2. 台指期夜盤成交量：35867 口
-3. 台指期日盤成交量：50701 口
-4. 夜盤量占比：41.4% (很強的訊號)
-5. 外資夜盤多空淨額：+17 口
-=======
-1. 台指期夜盤漲跌：▼-271
-2. 台指期夜盤成交量：28989 口
-3. 台指期日盤成交量：49606 口
-4. 夜盤量占比：36.9% (中性看待)
-5. 外資夜盤多空淨額：-577 口
->>>>>>> Stashed changes
+3. 台指期日盤成交量：53336 口
+4. 夜盤量占比：40.2% (很強的訊號)
+5. 外援夜盤多空淨額：請手動輸入 口
 
 請參考以下原則：
 - 夜盤量占比 <30% 參考價值低，>40% 很強的訊號。
 - 綜合研判範例：
   (1) 夜盤上漲，多空淨額為正：上漲力道紮實。
   (2) 夜盤上漲，多空淨額為負：上漲力道不強，盤中或尾盤可能往下走。
-  (3) 夜盤下跌，多空淨額為負：外資看跌，開盤可能往下修正。
+  (3) 夜盤下跌，多空淨額為負：外援看跌，開盤可能往下修正。
   (4) 夜盤下跌，多空淨額為正：抄底機會，開盤可能往下修正再反彈。</div>
             <button class="btn" onclick="copyPrompt()">📋 複製提示詞</button>
         </div>
