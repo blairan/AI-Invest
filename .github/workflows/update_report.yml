@@ -37,8 +37,16 @@ jobs:
           git config --local user.email "blairan121122885@gmail.com"
           git config --local user.name "blairan"
           git config core.autocrlf false
-          git reset --hard HEAD
-          git pull --rebase origin main
+          # 先新增 HTML 檔案
           git add daily_report.html index.html
-          git commit -m "Auto-update daily report" || exit 0
+          # 檢查是否有變更要提交
+          if git diff --staged --quiet; then
+            echo "沒有新的資料更新"
+            exit 0
+          fi
+          # 先 commit 本地變更
+          git commit -m "$(date '+%Y-%m-%d') daily report update"
+          # pull 並 rebase 遠端變更
+          git pull --rebase origin main
+          # push 到遠端
           git push
