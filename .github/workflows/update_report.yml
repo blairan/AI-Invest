@@ -2,9 +2,9 @@ name: Auto Update TAIFEX Report
 
 on:
   schedule:
-    # 每天早上 06:30 (台灣時間) 自動執行 (UTC 時間為前一天的 22:30)
+    # 每天早上 07:30 (台灣時間) 自動執行 (UTC 時間為前一天的 23:30)
     # 此時夜盤已收盤且盤後法人數據已公布
-    - cron: '30 22 * * *'
+    - cron: '30 23 * * *'
   workflow_dispatch: # 允許在 GitHub 網頁上手動點擊執行
 
 permissions:
