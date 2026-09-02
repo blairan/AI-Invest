@@ -130,11 +130,11 @@ def get_market_data():
 
         if not night_date_found:
             print(f"  未找到夜盤 TX 資料，嘗試整頁搜尋...")
-            # 除錯：列出前幾行的內容
-            if table_night:
-                for i, row in enumerate(table_night.find_all('tr')[:5]):
-                    tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
-                    print(f"    Row {i}: {tds[:10]}")
+        # 除錯：列出前幾行的內容（不論是否找到）
+        if table_night:
+            for i, row in enumerate(table_night.find_all('tr')[:8]):
+                tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
+                print(f"    Row {i}: {tds[:12]}")
 
     except Exception as e:
         print(f"  取得夜盤資料失敗: {e}")
