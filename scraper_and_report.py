@@ -91,14 +91,14 @@ def get_market_data():
 
     # ── 2. 取得夜盤資料 (盤後交易時段) ──────────────────────────────
     # 夜盤是 15:00 ~ 隔日 05:00，
-    # 若在 07:00 執行，昨夜夜盤（昨日 15:00 ~ 今晨 05:00）已收盤
-    # 查詢時傳入「昨天」作為日期參數
+    # 若在 07:30 執行，今晨 05:00 夜盤已收盤
+    # 查詢時傳入「今天」作為日期參數（因為這場夜盤是昨天15:00開盤，今天05:00收盤）
     night_volume = 0
     night_price_change = ""
     night_date_found = None
     try:
-        # 夜盤查詢日期 = 前一天（因為夜盤是前一天15:00開盤）
-        night_query_date = get_last_trading_day(taiwan_now)
+        # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
+        night_query_date = taiwan_now.date()
         night_date_str = night_query_date.strftime('%Y/%m/%d')
         print(f"  查詢夜盤日期: {night_date_str}")
 
