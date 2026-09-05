@@ -97,8 +97,10 @@ def get_market_data():
     night_price_change = ""
     night_date_found = None
     try:
-        # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
-        night_query_date = taiwan_now.date()
+        # 夜盤查詢日期 = 昨天（抓取已結束的昨夜夜盤）
+        # 例如：今早 07:30 執行，昨夜夜盤是昨天 15:00 ~ 今早 05:00
+        # API 的 marketCode=1 以「開盤日」計算，所以要查昨天
+        night_query_date = taiwan_now.date() - datetime.timedelta(days=1)
         night_date_str = night_query_date.strftime('%Y/%m/%d')
         print(f"  查詢夜盤日期: {night_date_str}")
 
