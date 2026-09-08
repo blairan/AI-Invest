@@ -96,48 +96,58 @@ def get_market_data():
     night_volume = 0
     night_price_change = ""
     night_date_found = None
-    try:
-        # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
-        # 昨夜夜盤是「昨天 15:00 ~ 今天 05:00」，
-        # 期交所 API 的 marketCode=1 以「收盤日」標示這場夜盤，歸屬在今天
-        # 例如：今早 07:30 執行，昨夜夜盤是 9/7 15:00 ~ 9/8 05:00，
-        # 這場夜盤在 API 中歸屬於 9/8
-        # 避免週末問題：週六/日執行時，get_last_trading_day 會自動回溯到上週五
-        night_query_date = taiwan_now.date()
-        night_date_str = night_query_date.strftime('%Y/%m/%d')
-        print(f"  查詢夜盤日期: {night_date_str}")
 
-        data_night = {
-            'queryType': 2,
-            'marketCode': 1,  # 夜盤
-            'commodity_id': 'TX',
-            'queryDate': night_date_str
-        }
-        res_night = requests.post(url, data=data_night, headers=headers, timeout=15)
-        res_night.encoding = 'utf-8'
-        soup_night = BeautifulSoup(res_night.text, 'html.parser')
-        table_night = soup_night.find('table', class_='table_f')
+    # 檢查是否為交易日（週末或連續假期跳過夜盤）
+    today = taiwan_now.date()
+    is_weekend = today.weekday() >= 5  # 5=週六, 6=週日
+    last_trading = get_last_trading_day(taiwan_now)
+    days_since_last_trading = (today - last_trading).days
+    is_holiday = days_since_last_trading > 1  # 超過1天沒開盤，可能是連假
 
-        if table_night:
-            rows = table_night.find_all('tr')
-            for row in rows:
-                tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
-                # TX 夜盤資料判斷：依據報價表結構
-                # tds[0] 為商品名稱，tds[6] 為漲跌，tds[8] 為成交量
-                if len(tds) > 8 and tds[0] == 'TX':
-                    raw_vol = tds[8].replace(',', '').strip()
-                    if raw_vol.isdigit():
-                        night_price_change = tds[6]
-                        night_volume = int(raw_vol)
-                        night_date_found = night_date_str
-                        print(f"  夜盤成交量: {night_volume}, 漲跌: {night_price_change}")
-                        break
+    if is_weekend or is_holiday:
+        print(f"  [跳過夜盤查詢] 今日為週末或連續假期，上次交易日為 {last_trading}")
+    else:
+        try:
+            # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
+            # 昨夜夜盤是「昨天 15:00 ~ 今天 05:00」，
+            # 期交所 API 的 marketCode=1 以「收盤日」標示這場夜盤，歸屬在今天
+            # 例如：今早 07:30 執行，昨夜夜盤是 9/7 15:00 ~ 9/8 05:00，
+            # 這場夜盤在 API 中歸屬於 9/8
+            night_query_date = taiwan_now.date()
+            night_date_str = night_query_date.strftime('%Y/%m/%d')
+            print(f"  查詢夜盤日期: {night_date_str}")
 
-        if not night_date_found:
-            print(f"  未找到夜盤 TX 資料")
+            data_night = {
+                'queryType': 2,
+                'marketCode': 1,  # 夜盤
+                'commodity_id': 'TX',
+                'queryDate': night_date_str
+            }
+            res_night = requests.post(url, data=data_night, headers=headers, timeout=15)
+            res_night.encoding = 'utf-8'
+            soup_night = BeautifulSoup(res_night.text, 'html.parser')
+            table_night = soup_night.find('table', class_='table_f')
 
-    except Exception as e:
-        print(f"  取得夜盤資料失敗: {e}")
+            if table_night:
+                rows = table_night.find_all('tr')
+                for row in rows:
+                    tds = [td.text.strip() for td in row.find_all(['td', 'th'])]
+                    # TX 夜盤資料判斷：依據報價表結構
+                    # tds[0] 為商品名稱，tds[6] 為漲跌，tds[8] 為成交量
+                    if len(tds) > 8 and tds[0] == 'TX':
+                        raw_vol = tds[8].replace(',', '').strip()
+                        if raw_vol.isdigit():
+                            night_price_change = tds[6]
+                            night_volume = int(raw_vol)
+                            night_date_found = night_date_str
+                            print(f"  夜盤成交量: {night_volume}, 漲跌: {night_price_change}")
+                            break
+
+            if not night_date_found:
+                print(f"  未找到夜盤 TX 資料")
+
+        except Exception as e:
+            print(f"  取得夜盤資料失敗: {e}")
 
     # ── 3. 取得三大法人外援夜盤多空淨額 ────────────────────────────
     foreign_net_position = "請手動輸入"
