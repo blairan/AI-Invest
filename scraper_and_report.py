@@ -97,15 +97,13 @@ def get_market_data():
     night_price_change = ""
     night_date_found = None
 
-    # 檢查是否為交易日（週末或連續假期跳過夜盤）
+    # 檢查是否為週末（週六、週日）
     today = taiwan_now.date()
     is_weekend = today.weekday() >= 5  # 5=週六, 6=週日
-    last_trading = get_last_trading_day(taiwan_now)
-    days_since_last_trading = (today - last_trading).days
-    is_holiday = days_since_last_trading > 1  # 超過1天沒開盤，可能是連假
 
-    if is_weekend or is_holiday:
-        print(f"  [跳過夜盤查詢] 今日為週末或連續假期，上次交易日為 {last_trading}")
+    # 週末直接跳過，不浪費 API 查詢
+    if is_weekend:
+        print(f"  [跳過夜盤查詢] 今日為週末（週六或週日）")
     else:
         try:
             # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
