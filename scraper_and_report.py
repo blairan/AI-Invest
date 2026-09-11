@@ -106,12 +106,12 @@ def get_market_data():
         print(f"  [跳過夜盤查詢] 今日為週末（週六或週日）")
     else:
         try:
-            # 夜盤查詢日期 = 今天（抓取已結束的昨夜夜盤）
+            # 夜盤查詢日期 = 上一個交易日（抓取已結束的昨夜夜盤）
             # 昨夜夜盤是「昨天 15:00 ~ 今天 05:00」，
-            # 期交所 API 的 marketCode=1 以「收盤日」標示這場夜盤，歸屬在今天
-            # 例如：今早 07:30 執行，昨夜夜盤是 9/7 15:00 ~ 9/8 05:00，
-            # 這場夜盤在 API 中歸屬於 9/8
-            night_query_date = taiwan_now.date()
+            # 例如：週五早上執行，昨夜夜盤是週四 15:00 ~ 週五 05:00
+            # 這場夜盤在期交所歸屬在「週四」（開盤日）
+            # 避免週末問題：週六/日查到上週五的夜盤
+            night_query_date = get_last_trading_day(taiwan_now)
             night_date_str = night_query_date.strftime('%Y/%m/%d')
             print(f"  查詢夜盤日期: {night_date_str}")
 

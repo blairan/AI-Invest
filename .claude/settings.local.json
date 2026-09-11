@@ -25,7 +25,8 @@
       "Bash(\"/c/Program Files/GitHub CLI/gh.exe\" repo clone blairan/AI-Invest AI-Invest-fix)",
       "Read(//e/我的AI投資系統/**)",
       "Skill(update-config)",
-      "Bash(claude --version)"
+      "Bash(claude --version)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
